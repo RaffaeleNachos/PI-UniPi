@@ -3,6 +3,8 @@ open LWC
 open System.Windows.Forms
 open System.Drawing
 
+let mutable operation = -1
+
 type LWButton() as this=
     inherit LWCControl()
 
@@ -15,14 +17,14 @@ type LWButton() as this=
         and set(v) =
             op <- v
     
-    member this.name
+    member this.Name
         with get() = label
         and set(v) = 
             label <- v
 
     override this.OnPaint(e) =
         let g = e.Graphics
-        g.FillRectangle(Brushes.Orange, 0.f , 0.f, 50.f, 30.f)
+        g.FillRectangle(Brushes.Orange, 0.f , 0.f, this.ClientSize.Width, this.ClientSize.Height)
         g.DrawString(label, myfont, Brushes.Black, 5.f, 9.f)
     
     override this.OnMouseDown(e) =
@@ -48,6 +50,14 @@ type LWButton() as this=
                 thematrix.RotateV(-10.f)
             | "rccw" ->
                 thematrix.RotateV(10.f)
+            | "nnote" ->
+                operation <- 1
+            | "dnote" ->
+                operation <- 2
+            | "text" ->
+                operation <- 3
+            | "image" ->
+                operation <- 4
             | _ -> ()
         this.Invalidate()
         base.OnMouseDown(e)
@@ -55,14 +65,18 @@ type LWButton() as this=
 type Canvas() as this =
     inherit LWCContainer()
 
-    let upbutton = new LWButton(name="UP",Position=PointF(80.f,20.f), Option = "up")
-    let downbutton = new LWButton(name="DOWN",Position=PointF(80.f,100.f), Option = "down")
-    let leftbutton = new LWButton(name="LEFT",Position=PointF(20.f,60.f), Option = "left")
-    let rightbutton = new LWButton(name="RIGHT",Position=PointF(140.f,60.f), Option = "right")
-    let zoominbutton = new LWButton(name="Z. IN",Position=PointF(20.f,140.f), Option = "zin")
-    let zoomoutbutton = new LWButton(name="Z. OUT",Position=PointF(140.f,140.f), Option = "zout")
-    let rotatecwbutton = new LWButton(name="R. CW",Position=PointF(20.f,180.f), Option = "rcw")
-    let rotateccwbutton = new LWButton(name="R. CCW",Position=PointF(140.f,180.f), Option = "rccw")
+    let upbutton = LWButton(Name="UP",Position=PointF(80.f,20.f), Option = "up")
+    let downbutton = LWButton(Name="DOWN",Position=PointF(80.f,100.f), Option = "down")
+    let leftbutton = LWButton(Name="LEFT",Position=PointF(20.f,60.f), Option = "left")
+    let rightbutton = LWButton(Name="RIGHT",Position=PointF(140.f,60.f), Option = "right")
+    let zoominbutton = LWButton(Name="Z. IN",Position=PointF(20.f,140.f), Option = "zin")
+    let zoomoutbutton = LWButton(Name="Z. OUT",Position=PointF(140.f,140.f), Option = "zout")
+    let rotatecwbutton = LWButton(Name="R. CW",Position=PointF(20.f,180.f), Option = "rcw")
+    let rotateccwbutton = LWButton(Name="R. CCW",Position=PointF(140.f,180.f), Option = "rccw")
+    let newnote = LWButton(Name="NOTE",Position=PointF(20.f,220.f), Option = "nnote")
+    let deletenote = LWButton(Name="DELETE",Position=PointF(140.f,220.f), Option = "dnote")
+    let text = LWButton(Name="TEXT",Position=PointF(20.f,260.f), Option = "text")
+    let imagenote = LWButton(Name="IMAGE",Position=PointF(140.f,260.f), Option = "image")
 
     do
         this.LWControls.Add(upbutton)
@@ -73,3 +87,12 @@ type Canvas() as this =
         this.LWControls.Add(zoomoutbutton)
         this.LWControls.Add(rotatecwbutton)
         this.LWControls.Add(rotateccwbutton)
+        this.LWControls.Add(newnote)
+        this.LWControls.Add(deletenote)
+        this.LWControls.Add(text)
+        this.LWControls.Add(imagenote)
+
+    member this.Op
+        with get() = operation
+        and set(v) = 
+            operation <- v
