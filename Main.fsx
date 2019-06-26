@@ -74,16 +74,15 @@ type DrawCanvas() as this =
 
     let raypassingtest numvert (vertarray : ResizeArray<Point>) (pointtest : Point) =
         let mutable i = 0
-        let mutable j = numvert - 1
-        let mutable isin = 0
+        let mutable isin = false
+        let mutable j = numvert-1
         while i < numvert do 
-            if (((vertarray.Item(i).Y > pointtest.Y) <> (vertarray.Item(j).Y > pointtest.Y)) && 
-                    (pointtest.X < (vertarray.Item(j).X-vertarray.Item(i).X) * (pointtest.Y-vertarray.Item(i).Y) / (vertarray.Item(j).Y-vertarray.Item(i).Y) + vertarray.Item(j).X)) then
-                isin <- (isin+1)%2
-            i <- i+1
+            if ( ((vertarray.Item(i).Y>pointtest.Y) <> (vertarray.Item(j).Y>pointtest.Y)) && (pointtest.X < (vertarray.Item(j).X-vertarray.Item(i).X) * (pointtest.Y-vertarray.Item(i).Y) / (vertarray.Item(j).Y-vertarray.Item(i).Y) + vertarray.Item(i).X) ) then
+                isin <- not isin
             j <- i
+            i <- i+1
         printfn "%A" isin
-        isin + 0
+        isin
 
 
     do timer.Tick.Add(fun _ ->
@@ -227,7 +226,7 @@ type DrawCanvas() as this =
             btnpoly.Click.Add(fun _ ->
                 this.Controls.Remove(btnpoly)
                 notes |> Seq.iter (fun n ->
-                    if ((raypassingtest polyvert.Count polyvert n.Location) = 1) then 
+                    if ((raypassingtest polyvert.Count polyvert n.Location)) then 
                         n.FixBgcolor <- Color.Yellow
                 )
                 //chiamo controllo punti interni
