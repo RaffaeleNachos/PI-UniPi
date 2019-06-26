@@ -58,6 +58,12 @@ type LWButton() as this=
                 operation <- 3
             | "image" ->
                 operation <- 4
+            | "rectsel" ->
+                operation <- 5
+            | "pin" ->
+                operation <- 6
+            | "polysel" ->
+                operation <- 7
             | _ -> ()
         this.Invalidate()
         base.OnMouseDown(e)
@@ -74,9 +80,12 @@ type Canvas() as this =
     let rotatecwbutton = LWButton(Name="R. CW",Position=PointF(20.f,180.f), Option = "rcw")
     let rotateccwbutton = LWButton(Name="R. CCW",Position=PointF(140.f,180.f), Option = "rccw")
     let newnote = LWButton(Name="NOTE",Position=PointF(20.f,220.f), Option = "nnote")
-    let deletenote = LWButton(Name="DELETE",Position=PointF(140.f,220.f), Option = "dnote")
-    let text = LWButton(Name="TEXT",Position=PointF(20.f,260.f), Option = "text")
-    let imagenote = LWButton(Name="IMAGE",Position=PointF(140.f,260.f), Option = "image")
+    let deletenote = LWButton(Name="DELETE",Position=PointF(20.f,260.f), Option = "dnote")
+    let text = LWButton(Name="TEXT",Position=PointF(80.f,220.f), Option = "text")
+    let imagenote = LWButton(Name="IMAGE",Position=PointF(80.f,260.f), Option = "image")
+    let select = LWButton(Name="SELECT",Position=PointF(140.f,220.f), Option = "rectsel")
+    let polyselect = LWButton(Name="POLYSEL",Position=PointF(200.f,220.f), Option = "polysel")
+    let pin = LWButton(Name="PIN",Position=PointF(140.f,260.f), Option = "pin")
 
     do
         this.LWControls.Add(upbutton)
@@ -91,6 +100,9 @@ type Canvas() as this =
         this.LWControls.Add(deletenote)
         this.LWControls.Add(text)
         this.LWControls.Add(imagenote)
+        this.LWControls.Add(select)
+        this.LWControls.Add(pin)
+        this.LWControls.Add(polyselect)
 
     member this.Op
         with get() = operation

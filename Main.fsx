@@ -10,7 +10,7 @@ type MyNote(r:Rectangle) as this=
     inherit LWCControl()
 
     let mutable box = r
-    let bgcolor = Color.LightYellow
+    let mutable bgcolor = Color.LightYellow
     let mytitlefont = new Font("Calibri", 16.f)
     let mutable title = "Lorem Ipsum"
     let mutable image = null
@@ -39,6 +39,11 @@ type MyNote(r:Rectangle) as this=
         and set(str) = 
             title <- str
     
+    member this.FixBgcolor
+        with get() = bgcolor
+        and set(v) = 
+            bgcolor <- v
+    
     override this.OnPaint(e) =
         let g = e.Graphics //ha come parametro il contesto grafico sul quale disegnerà
         let bkg = e.Graphics.Save()
@@ -52,17 +57,69 @@ type MyNote(r:Rectangle) as this=
 type DrawCanvas() as this =
     inherit Canvas()
 
-    do this.SetStyle(ControlStyles.OptimizedDoubleBuffer, true)
+    do this.SetStyle(ControlStyles.AllPaintingInWmPaint ||| ControlStyles.OptimizedDoubleBuffer, true)
+
+    let mutable start = None
+    let duration = new System.TimeSpan(0,0,0,0,1000)
 
     let notes = ResizeArray<MyNote>() //è il mio array di note
     let mutable drag = None
     let mutable newnote = None
+    
+    let mutable lasso = None
+    let pointsin = ResizeArray<Point>()
+
+    let timer = new Timer(Interval=100)
+
+    do timer.Tick.Add(fun _ ->
+        let easingfunction (start:System.DateTime) (duration:System.TimeSpan) t =
+            let dt = t - start
+            single(dt.TotalMilliseconds) / single(duration.TotalMilliseconds)
+
+        if start.IsNone then
+            start <- Some (System.DateTime.Now)
+        
+        let perc = easingfunction start.Value duration System.DateTime.Now
+        printfn "%A" perc
+        if perc >= 1.f  then 
+            timer.Stop()
+            start <- None
+            notes |> Seq.iter (fun b ->
+                b.FixBgcolor <- Color.LightYellow
+            )
+            this.Op <- -1
+        
+        let linearbezier (x1 : float32) (x2 : float32)  t1 = 
+            let  p1 = x1 * (1.f - t1)
+            let  p2 = t1 * x2
+            p1 + p2
+        
+        let mutable endpoint = Point()
+
+        notes |> Seq.iter (fun b ->
+            if (b.FixBgcolor = Color.Yellow) then 
+                endpoint <- b.Location
+        )
+        
+        notes |> Seq.iter (fun b ->
+            let x = linearbezier (float32 b.Location.X) (float32 endpoint.X) perc
+            let y = linearbezier (float32 b.Location.Y) (float32 endpoint.Y) perc
+            if b.FixBgcolor = Color.Yellow then 
+                b.Location <- Point((int x), (int y))
+        )
+
+        this.Invalidate()
+    )
+
+    //let polyvert = Point[]
+    let mutable selected = -1
 
     let mkrect (sx, sy) (ex, ey) = //funzione che mi restituisce un rettangolo dato che posso disegnarlo anche con le prime coordinate in basso a destra e le seconde in altro a sinistra
         Rectangle(min sx ex, min sy ey, abs(sx - ex), abs(sy - ey))
 
     override this.OnPaint e =
         let g = e.Graphics
+        g.SmoothingMode <- Drawing2D.SmoothingMode.HighQuality
         let t = g.Transform
         g.Transform <- this.Mtrasf.WV //mi faccio restituire la matrice dove sono contenuti i controlli per disegnarci sopra
         notes |> Seq.iter (fun b -> //Seq.iter applica a tutti gli elementi dell'array la funzione che gli passo come argomento
@@ -79,8 +136,19 @@ type DrawCanvas() as this =
         g.DrawRectangle(p, r)
         | _ -> ()
 
+        match lasso with
+        | Some ((sx, sy), (ex, ey)) ->
+        let r = mkrect (sx, sy) (ex, ey)
+        use p = new Pen(Color.Red)
+        p.DashStyle <- Drawing2D.DashStyle.DashDot
+        g.DrawRectangle(p, r)
+        | _ -> ()
+
+        //if selected = 1 then g.DrawPolygon(Pens.Red, polyvert)
+
     override this.OnMouseDown e =
         //il primo passo è fare la Pick correlation
+        //let newpoint = TransformPointV (this.Transform.VW) (Point(e.X, e.Y))
         let b = notes |> Seq.tryFindBack (fun box -> box.Contains(e.X, e.Y))
         if (this.Op = -1) then 
             match b with
@@ -101,7 +169,7 @@ type DrawCanvas() as this =
             this.Op <- -1
         if (this.Op=4) then
             let dlg = new OpenFileDialog()
-            dlg.Filter <- "*.BMP|*.JPG|*.JPEG|*.PNG"
+            dlg.Filter <- "*.JPG|*.JPEG|*.PNG"
             match b with
             | Some box -> 
                 if dlg.ShowDialog() = DialogResult.OK then
@@ -119,6 +187,7 @@ type DrawCanvas() as this =
                 this.Controls.Add(tb)
                 this.Controls.Add(btn1)
                 this.Controls.Add(btn2)
+                tb.Text <- box.FixText
                 btn1.Click.Add(fun _ ->
                     box.FixText <- tb.Text
                     this.Invalidate())
@@ -129,8 +198,20 @@ type DrawCanvas() as this =
                     )
             | _ -> ()
             this.Op <- -1
+        if (this.Op=5) then
+            match lasso with
+            | _ -> lasso <- Some ((e.X, e.Y), (e.X, e.Y))
+     (* if this.Op=7 then
+            polyvert.Add(e.Location)
+            printfn "%A" polyvert
+            let btn = new Button(Text="FINE Poly", Location=Point(20,420), Width=85)
+            this.Controls.Add(btn)
+            btn.Click.Add(fun _ ->
+                selected <- 1
+                this.Controls.Remove(btn)
+                this.Invalidate()) *)
         base.OnMouseDown(e)
-        this.Invalidate()
+        //this.Invalidate() ???????
 
     override this.OnMouseMove e =
         match newnote with
@@ -141,6 +222,11 @@ type DrawCanvas() as this =
         match drag with
         | Some(box, dx, dy) ->
           box.Location <- Point(e.X - dx, e.Y - dy)
+          this.Invalidate()
+        | _ -> ()
+        match lasso with
+        | Some ((sx, sy), _) -> 
+          lasso <- Some((sx, sy), (e.X, e.Y))
           this.Invalidate()
         | _ -> ()
 
@@ -155,16 +241,18 @@ type DrawCanvas() as this =
           this.Invalidate()
         | _ ->
           drag <- None
-                 
 
-    (* override this.OnPaint(e) =
-        let g = e.Graphics 
-        let t = g.Transform
-        g.Transform <- this.Mtrasf.WV //mi faccio restituire la matrice dove sono contenuti i controlli per disegnarci sopra
-        g.DrawLine(Pens.Red, 0.f, 0.f, 200.f, 200.f)
-        //drawings |> Seq.iter (fun s -> s.OnPaint(e))
-        g.Transform <- t //ripristino la matrice
-        base.OnPaint(e) *)
+        match lasso with
+        | Some((sx, sy), (ex, ey)) ->
+          let rect = mkrect (sx, sy) (ex, ey)
+          notes |> Seq.iter (fun nt -> if rect.Contains(nt.Location) then nt.FixBgcolor <- Color.Yellow)
+          lasso <- None
+          this.Invalidate()
+        | _ -> ()
+
+        if this.Op=6 then
+            timer.Start()
+
 
 let f = new Form(Text="MidTerm: Raffaele Apetino", TopMost=true)
 let draw = new DrawCanvas(Dock=DockStyle.Fill)
