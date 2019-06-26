@@ -1,3 +1,4 @@
+open System
 #load "LWC.fsx"
 #load "Buttons.fsx"
 open LWC
@@ -60,7 +61,7 @@ type DrawCanvas() as this =
     do this.SetStyle(ControlStyles.AllPaintingInWmPaint ||| ControlStyles.OptimizedDoubleBuffer, true)
 
     let mutable start = None
-    let duration = new System.TimeSpan(0,0,0,0,1000)
+    let duration = System.TimeSpan(0,0,0,0,1000)
 
     let notes = ResizeArray<MyNote>() //è il mio array di note
     let mutable drag = None
@@ -70,6 +71,20 @@ type DrawCanvas() as this =
     let pointsin = ResizeArray<Point>()
 
     let timer = new Timer(Interval=100)
+
+    let raypassingtest numvert (vertarray : ResizeArray<Point>) (pointtest : Point) =
+        let mutable i = 0
+        let mutable j = numvert - 1
+        let mutable isin = 0
+        while i < numvert do 
+            if (((vertarray.Item(i).Y > pointtest.Y) <> (vertarray.Item(j).Y > pointtest.Y)) && 
+                    (pointtest.X < (vertarray.Item(j).X-vertarray.Item(i).X) * (pointtest.Y-vertarray.Item(i).Y) / (vertarray.Item(j).Y-vertarray.Item(i).Y) + vertarray.Item(j).X)) then
+                isin <- (isin+1)%2
+            i <- i+1
+            j <- i
+        printfn "%A" isin
+        isin + 0
+
 
     do timer.Tick.Add(fun _ ->
         let easingfunction (start:System.DateTime) (duration:System.TimeSpan) t =
@@ -111,7 +126,8 @@ type DrawCanvas() as this =
         this.Invalidate()
     )
 
-    //let polyvert = Point[]
+    let polyvert = ResizeArray<Point>()
+    let mutable numvert = 0
     let mutable selected = -1
 
     let mkrect (sx, sy) (ex, ey) = //funzione che mi restituisce un rettangolo dato che posso disegnarlo anche con le prime coordinate in basso a destra e le seconde in altro a sinistra
@@ -144,7 +160,9 @@ type DrawCanvas() as this =
         g.DrawRectangle(p, r)
         | _ -> ()
 
-        //if selected = 1 then g.DrawPolygon(Pens.Red, polyvert)
+        if selected = 1 then 
+            for i in 0..polyvert.Count-1 do
+                g.DrawLine(Pens.Red, polyvert.Item(i), polyvert.Item((i+1)%(polyvert.Count)))
 
     override this.OnMouseDown e =
         //il primo passo è fare la Pick correlation
@@ -169,7 +187,7 @@ type DrawCanvas() as this =
             this.Op <- -1
         if (this.Op=4) then
             let dlg = new OpenFileDialog()
-            dlg.Filter <- "*.JPG|*.JPEG|*.PNG"
+            dlg.Filter <- "|*.JPG|*.JPEG|*.PNG"
             match b with
             | Some box -> 
                 if dlg.ShowDialog() = DialogResult.OK then
@@ -201,17 +219,25 @@ type DrawCanvas() as this =
         if (this.Op=5) then
             match lasso with
             | _ -> lasso <- Some ((e.X, e.Y), (e.X, e.Y))
-     (* if this.Op=7 then
+        if (this.Op=7) then
+            let btnpoly = new Button(Text="FINE Poly", Location=Point(20,300), Width=85)
+            if polyvert.Count = 0 then this.Controls.Add(btnpoly)
             polyvert.Add(e.Location)
-            printfn "%A" polyvert
-            let btn = new Button(Text="FINE Poly", Location=Point(20,420), Width=85)
-            this.Controls.Add(btn)
-            btn.Click.Add(fun _ ->
-                selected <- 1
-                this.Controls.Remove(btn)
-                this.Invalidate()) *)
+            if polyvert.Count > 2 then selected <- 1
+            btnpoly.Click.Add(fun _ ->
+                this.Controls.Remove(btnpoly)
+                notes |> Seq.iter (fun n ->
+                    if ((raypassingtest polyvert.Count polyvert n.Location) = 1) then 
+                        n.FixBgcolor <- Color.Yellow
+                )
+                //chiamo controllo punti interni
+                polyvert.Clear()
+                selected <- -1
+                this.Op <- -1
+                this.Invalidate()
+                )
         base.OnMouseDown(e)
-        //this.Invalidate() ???????
+        this.Invalidate()
 
     override this.OnMouseMove e =
         match newnote with
@@ -252,7 +278,6 @@ type DrawCanvas() as this =
 
         if this.Op=6 then
             timer.Start()
-
 
 let f = new Form(Text="MidTerm: Raffaele Apetino", TopMost=true)
 let draw = new DrawCanvas(Dock=DockStyle.Fill)
