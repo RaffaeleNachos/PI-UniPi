@@ -1,4 +1,5 @@
-open System
+//Raffaele Apetino, student @ Unipi: 549220
+
 #load "LWC.fsx"
 #load "Buttons.fsx"
 open LWC
@@ -21,14 +22,17 @@ type MyNote(r:Rectangle) as this=
     
     member this.X
         with get () = box.X
-        and set(v) = box <- Rectangle(v, box.Y, box.Width, box.Height)
+        and set(v) = 
+            box <- Rectangle(v, box.Y, box.Width, box.Height)
     member this.Y
         with get () = box.Y
-        and set(v) = box <- Rectangle(box.X, v, box.Width, box.Height)
+        and set(v) = 
+            box <- Rectangle(box.X, v, box.Width, box.Height)
         
-    member this.Location //serve per spostare in una sola volta la scatola x,y
+    member this.Location
         with get() = Point(box.X, box.Y)
-        and set(v:Point) = box <- Rectangle (v.X, v.Y, box.Width, box.Height)
+        and set(v:Point) = 
+            box <- Rectangle (v.X, v.Y, box.Width, box.Height)
     
     member this.FixImage
         with get() = image
@@ -46,38 +50,38 @@ type MyNote(r:Rectangle) as this=
             bgcolor <- v
     
     override this.OnPaint(e) =
-        let g = e.Graphics //ha come parametro il contesto grafico sul quale disegnerà
+        let g = e.Graphics
         let bkg = e.Graphics.Save()
         use b = new SolidBrush(bgcolor)
         g.SetClip(Rectangle(this.Location.X, this.Location.Y, this.ClientSizeInt.Height, this.ClientSizeInt.Width))
         g.FillRectangle(b, box)
-        if image <> null then g.DrawImage(image, RectangleF(PointF(float32 this.Location.X, float32 this.Location.Y),SizeF(this.ClientSize.Height,this.ClientSize.Width)))
+        if not (isNull image) then g.DrawImage(image, RectangleF(PointF(float32 this.Location.X, float32 this.Location.Y),SizeF(this.ClientSize.Height,this.ClientSize.Width)))
         g.DrawString(title, mytitlefont, Brushes.Black, float32 this.Location.X, float32 this.Location.Y)
         e.Graphics.Restore(bkg)
-
+    
 type DrawCanvas() as this =
     inherit Canvas()
 
     do this.SetStyle(ControlStyles.AllPaintingInWmPaint ||| ControlStyles.OptimizedDoubleBuffer, true)
 
+    //var per timer
     let mutable start = None
     let duration = System.TimeSpan(0,0,0,0,1000)
+    let timer = new Timer(Interval=100)
 
     let notes = ResizeArray<MyNote>() //è il mio array di note
     let mutable drag = None
     let mutable newnote = None
     
     let mutable lasso = None
-    let pointsin = ResizeArray<Point>()
-
-    let timer = new Timer(Interval=100)
     
     let raypassingtest numvert (vertarray : ResizeArray<Point>) (pointtest : Point) =
         let mutable i = 0
         let mutable isin = false
         let mutable j = numvert-1
         while i < numvert do 
-            if ( ((vertarray.Item(i).Y>pointtest.Y) <> (vertarray.Item(j).Y>pointtest.Y)) && (pointtest.X < (vertarray.Item(j).X-vertarray.Item(i).X) * (pointtest.Y-vertarray.Item(i).Y) / (vertarray.Item(j).Y-vertarray.Item(i).Y) + vertarray.Item(i).X) ) then
+            if ( ((vertarray.Item(i).Y>pointtest.Y) <> (vertarray.Item(j).Y>pointtest.Y)) && 
+                    (pointtest.X < (vertarray.Item(j).X-vertarray.Item(i).X) * (pointtest.Y-vertarray.Item(i).Y) / (vertarray.Item(j).Y-vertarray.Item(i).Y) + vertarray.Item(i).X) ) then
                 isin <- not isin
             j <- i
             i <- i+1
@@ -97,30 +101,34 @@ type DrawCanvas() as this =
         if perc >= 1.f  then 
             timer.Stop()
             start <- None
+            //rimetto il bgcolor stock
             notes |> Seq.iter (fun b ->
                 b.FixBgcolor <- Color.LightYellow
             )
             this.Op <- -1
         
-        let linearbezier (x1 : float32) (x2 : float32)  t1 = 
-            let  p1 = x1 * (1.f - t1)
-            let  p2 = t1 * x2
-            p1 + p2
+        //funzione di easing easeInQuart approssimabile con bz
+        let easeInQuart (x1 : float32) (x2 : float32)  t1 = 
+            let mutable xstart = x1 
+            let mutable xend = x2
+            xend <- xend - xstart
+            let result = (xend * t1 * t1 * t1 * t1) + xstart
+            result
         
         let mutable endpoint = Point()
 
         notes |> Seq.iter (fun b ->
+            //il punto di arrivo sarà l'ultima nota nell'array tra le note selezionate 
             if (b.FixBgcolor = Color.Yellow) then 
                 endpoint <- b.Location
         )
         
         notes |> Seq.iter (fun b ->
-            let x = linearbezier (float32 b.Location.X) (float32 endpoint.X) perc
-            let y = linearbezier (float32 b.Location.Y) (float32 endpoint.Y) perc
+            let x = easeInQuart (float32 b.Location.X) (float32 endpoint.X) perc
+            let y = easeInQuart (float32 b.Location.Y) (float32 endpoint.Y) perc
             if b.FixBgcolor = Color.Yellow then 
                 b.Location <- Point((int x), (int y))
         )
-
         this.Invalidate()
     )
 
@@ -138,8 +146,8 @@ type DrawCanvas() as this =
         let t = g.Transform
         g.Transform <- this.Mtrasf.WV //mi faccio restituire la matrice dove sono contenuti i controlli per disegnarci sopra
         
-        notes |> Seq.iter (fun b -> //Seq.iter applica a tutti gli elementi dell'array la funzione che gli passo come argomento
-            b.OnPaint(e) //come se fosse un for dove chiamo boxes[i].OnPaint e gli passo il contesto grafico
+        notes |> Seq.iter (fun b ->
+            b.OnPaint(e) 
         )
 
         match newnote with
@@ -162,7 +170,7 @@ type DrawCanvas() as this =
             use p = new Pen(Color.Red)
             p.DashStyle <- Drawing2D.DashStyle.Dash
             for i in 0..polyvert.Count-1 do
-                g.DrawLine(p, polyvert.Item(i), polyvert.Item((i+1)%(polyvert.Count)))
+                g.DrawLine(p, polyvert.Item(i), polyvert.Item((i+1)%(polyvert.Count))) //utilizzo array come memoria circolare e disegno le rette da punto i a punto successivo i+1
 
         g.Transform <- t //ripristino la matrice
 
@@ -171,24 +179,51 @@ type DrawCanvas() as this =
         this.Mtrasf.VW.TransformPoints(newpoint) //questo casino perchè transformPoints vuole un array, dannati framework
         //sto trasformando il punto da coordinate viste a coordinate mondo ruotate/traslate ecc..
         let b = notes |> Seq.tryFindBack (fun box -> box.Contains(newpoint.[0].X, newpoint.[0].Y))
-        if (this.Op = -1) then 
+        if (this.Op = -1) then  //nulla selezionato drag n drop
             match b with
             | Some box ->
-                let dx, dy = newpoint.[0].X - box.X, newpoint.[0].Y - box.Y //offset del click all'interno di box
+                let dx, dy = newpoint.[0].X - box.X, newpoint.[0].Y - box.Y
                 drag <- Some (box, dx, dy)
             | _ -> ()
             this.Op <- -1
-        if (this.Op = 1) then
+        if (this.Op = 1) then //nuova nota
             match b with
             | _ -> newnote <- Some ((newpoint.[0].X, newpoint.[0].Y), (newpoint.[0].X, newpoint.[0].Y))
             this.Op <- -1
-        if (this.Op = 2) then
+        if (this.Op = 2) then //elimina nota
             match b with
             | Some box ->
                 notes.Remove(box) |> ignore
             | _ -> ()
             this.Op <- -1
-        if (this.Op=4) then
+        if (this.Op=3) then //aggiungi o modifica testo
+            let tb = new TextBox(Location=Point(20,300), Width=170, Height=120, Multiline=true)
+            let btn1 = new Button(Text="Ok", Location=Point(20,425), Width=85)
+            let btn2 = new Button(Text="Fine", Location=Point(105,425), Width=85)
+            let btn3 = new Button(Text="Rimuovi Immagine", Location=Point(20,452), Width=170)
+            match b with
+            | Some box -> 
+                this.Controls.Add(tb)
+                this.Controls.Add(btn1)
+                this.Controls.Add(btn2)
+                this.Controls.Add(btn3)
+                tb.Text <- box.FixText
+                btn1.Click.Add(fun _ ->
+                    box.FixText <- tb.Text
+                    this.Invalidate())
+                btn2.Click.Add(fun _ ->
+                    this.Controls.Remove(tb)
+                    this.Controls.Remove(btn1)
+                    this.Controls.Remove(btn2)
+                    this.Controls.Remove(btn3)
+                    )
+                btn3.Click.Add(fun _ ->
+                    box.FixImage <- null
+                    this.Invalidate()
+                    )
+            | _ -> ()
+            this.Op <- -1
+        if (this.Op=4) then //aggiungi immagine
             let dlg = new OpenFileDialog()
             dlg.Filter <- "|*.BMP;*.JPG;*.GIF;*.PNG"
             match b with
@@ -199,34 +234,14 @@ type DrawCanvas() as this =
                     box.FixImage <- myPicture
             | _ -> ()
             this.Op <- -1
-        if (this.Op=3) then
-            let tb = new TextBox(Location=Point(20,300), Width=170, Height=120, Multiline=true)
-            let btn1 = new Button(Text="Ok", Location=Point(20,420), Width=85)
-            let btn2 = new Button(Text="Fine", Location=Point(105,420), Width=85)
-            match b with
-            | Some box -> 
-                this.Controls.Add(tb)
-                this.Controls.Add(btn1)
-                this.Controls.Add(btn2)
-                tb.Text <- box.FixText
-                btn1.Click.Add(fun _ ->
-                    box.FixText <- tb.Text
-                    this.Invalidate())
-                btn2.Click.Add(fun _ ->
-                    this.Controls.Remove(tb)
-                    this.Controls.Remove(btn1)
-                    this.Controls.Remove(btn2)
-                    )
-            | _ -> ()
-            this.Op <- -1
-        if (this.Op=5) then
+        if (this.Op=5) then //lasso rettangolare
             match lasso with
             | _ -> lasso <- Some ((newpoint.[0].X, newpoint.[0].Y), (newpoint.[0].X, newpoint.[0].Y))
-        if (this.Op=7) then
+        if (this.Op=7) then //lasso poligonale
             let btnpoly = new Button(Text="FINE Poly", Location=Point(20,300), Width=85)
             if polyvert.Count = 0 then this.Controls.Add(btnpoly)
             polyvert.Add(Point(newpoint.[0].X, newpoint.[0].Y))
-            if polyvert.Count > 2 then selected <- 1
+            if polyvert.Count > 1 then selected <- 1 //se ci sono più di 2 punti inizio a disengare il poligono
             btnpoly.Click.Add(fun _ ->
                 this.Controls.Remove(btnpoly)
                 //chiamo controllo punti interni
@@ -243,9 +258,8 @@ type DrawCanvas() as this =
         this.Invalidate()
 
     override this.OnMouseMove e =
-        let newpoint = [| (Point(e.X, e.Y)) |] //mi creo il mio array di singolo punto
-        this.Mtrasf.VW.TransformPoints(newpoint) //questo casino perchè transformPoints vuole un array, dannati framework
-        //sto trasformando il punto da coordinate viste a coordinate mondo ruotate/traslate ecc..
+        let newpoint = [| (Point(e.X, e.Y)) |] 
+        this.Mtrasf.VW.TransformPoints(newpoint)
         match newnote with
         | Some ((sx, sy), _) ->  //mi mantengo sx,sy e non mi interesso dei punti di arrivo perchè li andrò a modificare
           newnote <- Some((sx, sy), (newpoint.[0].X, newpoint.[0].Y))
@@ -268,7 +282,7 @@ type DrawCanvas() as this =
           let rect = mkrect (sx, sy) (ex, ey)
           let r = MyNote(rect)
           r.ClientSize <- SizeF(float32 rect.Height, float32 rect.Width)
-          notes.Add(r)
+          notes.Add(r) //aggiungo la nota
           newnote <- None
           this.Invalidate()
         | _ ->

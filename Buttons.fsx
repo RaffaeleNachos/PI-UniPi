@@ -1,3 +1,5 @@
+//Raffaele Apetino, student @ Unipi: 549220
+
 #load "LWC.fsx"
 open LWC
 open System.Windows.Forms
@@ -28,10 +30,10 @@ type LWButton() as this=
         g.DrawString(label, myfont, Brushes.Black, 5.f, 9.f)
     
     override this.OnMouseDown(e) =
-        let mutable drawspace = (this :> LWCControl).Parent
-        let mutable thematrix = WVMatrix()
+        let mutable drawspace = (this :> LWCControl).Parent //mi faccio restituire il padre che viene associato alla creazione del bottone
+        let mutable thematrix = WVMatrix() //creo la mia matrice
         match drawspace with
-            | Some p -> thematrix <- p.Mtrasf
+            | Some p -> thematrix <- p.Mtrasf //associo alla mia matrice quella del padre (container di controlli)
             | _ -> ()
         match op with
             | "up" ->
