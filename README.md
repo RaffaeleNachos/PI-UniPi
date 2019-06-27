@@ -7,6 +7,6 @@ Si vuole realizzare un controllo grafico che consenta di visualizzare e modifica
 ## Esercizio 2
 Si estenda il controllo dell’esercizio 1 per consentire di selezionare più note mediante una selezione col mouse (in stile lasso: si disegna un contorno e le note al suo interno saranno selezionate) e, mediante opportuna animazione, impilarle una sopra l’altra come se un blocco di post-it. Si consenta la rotazione delle singole note.
 
-## Mio Progetto Final
+## Progetto Final
 https://raffaelenachos.github.io/FruitSliceJS/
 
