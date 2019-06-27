@@ -71,7 +71,7 @@ type DrawCanvas() as this =
     let pointsin = ResizeArray<Point>()
 
     let timer = new Timer(Interval=100)
-
+    
     let raypassingtest numvert (vertarray : ResizeArray<Point>) (pointtest : Point) =
         let mutable i = 0
         let mutable isin = false
@@ -83,7 +83,6 @@ type DrawCanvas() as this =
             i <- i+1
         printfn "%A" isin
         isin
-
 
     do timer.Tick.Add(fun _ ->
         let easingfunction (start:System.DateTime) (duration:System.TimeSpan) t =
@@ -133,21 +132,21 @@ type DrawCanvas() as this =
         Rectangle(min sx ex, min sy ey, abs(sx - ex), abs(sy - ey))
 
     override this.OnPaint e =
+        base.OnPaint(e)
         let g = e.Graphics
         g.SmoothingMode <- Drawing2D.SmoothingMode.HighQuality
         let t = g.Transform
         g.Transform <- this.Mtrasf.WV //mi faccio restituire la matrice dove sono contenuti i controlli per disegnarci sopra
+        
         notes |> Seq.iter (fun b -> //Seq.iter applica a tutti gli elementi dell'array la funzione che gli passo come argomento
             b.OnPaint(e) //come se fosse un for dove chiamo boxes[i].OnPaint e gli passo il contesto grafico
         )
-        g.Transform <- t //ripristino la matrice
-        base.OnPaint(e)
 
         match newnote with
         | Some ((sx, sy), (ex, ey)) ->
         let r = mkrect (sx, sy) (ex, ey) //è il rettangolo tratteggiato, infatti non viene aggiunto all'array
         use p = new Pen(Color.Gray)
-        p.DashStyle <- Drawing2D.DashStyle.DashDot //tratteggiatura
+        p.DashStyle <- Drawing2D.DashStyle.Dash //tratteggiatura
         g.DrawRectangle(p, r)
         | _ -> ()
 
@@ -155,28 +154,33 @@ type DrawCanvas() as this =
         | Some ((sx, sy), (ex, ey)) ->
         let r = mkrect (sx, sy) (ex, ey)
         use p = new Pen(Color.Red)
-        p.DashStyle <- Drawing2D.DashStyle.DashDot
+        p.DashStyle <- Drawing2D.DashStyle.Dash
         g.DrawRectangle(p, r)
         | _ -> ()
 
         if selected = 1 then 
+            use p = new Pen(Color.Red)
+            p.DashStyle <- Drawing2D.DashStyle.Dash
             for i in 0..polyvert.Count-1 do
-                g.DrawLine(Pens.Red, polyvert.Item(i), polyvert.Item((i+1)%(polyvert.Count)))
+                g.DrawLine(p, polyvert.Item(i), polyvert.Item((i+1)%(polyvert.Count)))
+
+        g.Transform <- t //ripristino la matrice
 
     override this.OnMouseDown e =
-        //il primo passo è fare la Pick correlation
-        //let newpoint = TransformPointV (this.Transform.VW) (Point(e.X, e.Y))
-        let b = notes |> Seq.tryFindBack (fun box -> box.Contains(e.X, e.Y))
+        let newpoint = [| (Point(e.X, e.Y)) |] //mi creo il mio array di singolo punto
+        this.Mtrasf.VW.TransformPoints(newpoint) //questo casino perchè transformPoints vuole un array, dannati framework
+        //sto trasformando il punto da coordinate viste a coordinate mondo ruotate/traslate ecc..
+        let b = notes |> Seq.tryFindBack (fun box -> box.Contains(newpoint.[0].X, newpoint.[0].Y))
         if (this.Op = -1) then 
             match b with
             | Some box ->
-            let dx, dy = e.X - box.X, e.Y - box.Y //offset del click all'interno di box
-            drag <- Some (box, dx, dy)
+                let dx, dy = newpoint.[0].X - box.X, newpoint.[0].Y - box.Y //offset del click all'interno di box
+                drag <- Some (box, dx, dy)
             | _ -> ()
             this.Op <- -1
         if (this.Op = 1) then
             match b with
-            | _ -> newnote <- Some ((e.X, e.Y), (e.X, e.Y))
+            | _ -> newnote <- Some ((newpoint.[0].X, newpoint.[0].Y), (newpoint.[0].X, newpoint.[0].Y))
             this.Op <- -1
         if (this.Op = 2) then
             match b with
@@ -186,7 +190,7 @@ type DrawCanvas() as this =
             this.Op <- -1
         if (this.Op=4) then
             let dlg = new OpenFileDialog()
-            dlg.Filter <- "|*.JPG|*.JPEG|*.PNG"
+            dlg.Filter <- "|*.BMP;*.JPG;*.GIF;*.PNG"
             match b with
             | Some box -> 
                 if dlg.ShowDialog() = DialogResult.OK then
@@ -217,19 +221,19 @@ type DrawCanvas() as this =
             this.Op <- -1
         if (this.Op=5) then
             match lasso with
-            | _ -> lasso <- Some ((e.X, e.Y), (e.X, e.Y))
+            | _ -> lasso <- Some ((newpoint.[0].X, newpoint.[0].Y), (newpoint.[0].X, newpoint.[0].Y))
         if (this.Op=7) then
             let btnpoly = new Button(Text="FINE Poly", Location=Point(20,300), Width=85)
             if polyvert.Count = 0 then this.Controls.Add(btnpoly)
-            polyvert.Add(e.Location)
+            polyvert.Add(Point(newpoint.[0].X, newpoint.[0].Y))
             if polyvert.Count > 2 then selected <- 1
             btnpoly.Click.Add(fun _ ->
                 this.Controls.Remove(btnpoly)
+                //chiamo controllo punti interni
                 notes |> Seq.iter (fun n ->
                     if ((raypassingtest polyvert.Count polyvert n.Location)) then 
                         n.FixBgcolor <- Color.Yellow
                 )
-                //chiamo controllo punti interni
                 polyvert.Clear()
                 selected <- -1
                 this.Op <- -1
@@ -239,19 +243,22 @@ type DrawCanvas() as this =
         this.Invalidate()
 
     override this.OnMouseMove e =
+        let newpoint = [| (Point(e.X, e.Y)) |] //mi creo il mio array di singolo punto
+        this.Mtrasf.VW.TransformPoints(newpoint) //questo casino perchè transformPoints vuole un array, dannati framework
+        //sto trasformando il punto da coordinate viste a coordinate mondo ruotate/traslate ecc..
         match newnote with
         | Some ((sx, sy), _) ->  //mi mantengo sx,sy e non mi interesso dei punti di arrivo perchè li andrò a modificare
-          newnote <- Some((sx, sy), (e.X, e.Y))
+          newnote <- Some((sx, sy), (newpoint.[0].X, newpoint.[0].Y))
           this.Invalidate()
         | _ -> ()
         match drag with
         | Some(box, dx, dy) ->
-          box.Location <- Point(e.X - dx, e.Y - dy)
+          box.Location <- Point(newpoint.[0].X - dx, newpoint.[0].Y - dy)
           this.Invalidate()
         | _ -> ()
         match lasso with
         | Some ((sx, sy), _) -> 
-          lasso <- Some((sx, sy), (e.X, e.Y))
+          lasso <- Some((sx, sy), (newpoint.[0].X, newpoint.[0].Y))
           this.Invalidate()
         | _ -> ()
 
@@ -281,7 +288,6 @@ type DrawCanvas() as this =
 let f = new Form(Text="MidTerm: Raffaele Apetino", TopMost=true)
 let draw = new DrawCanvas(Dock=DockStyle.Fill)
 
-draw.Invalidate()
 f.Controls.Add(draw)
 f.MinimumSize <- Size(800,800)
 f.Show()
